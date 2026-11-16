@@ -1,3 +1,5 @@
+#ignore these 
+#were needed for the java program but not in python
 out/
 *.class
 config.properties
