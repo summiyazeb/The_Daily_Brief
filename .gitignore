@@ -1,0 +1,8 @@
+out/
+*.class
+config.properties
+.env
+__pycache__/
+venv/
+.idea/
+.vscode/
