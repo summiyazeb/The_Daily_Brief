@@ -1,0 +1,4 @@
+slack-sdk==3.48.0
+openai==3.57.0
+python-dotenv==1.2.4
+pydantic==2.14.4
