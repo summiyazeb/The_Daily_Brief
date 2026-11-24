@@ -1,9 +1,11 @@
+
 from slack_sdk.errors import SlackApiError
 
 
 def get_channels(client, include_private=True):
     channels = []
     cursor = None
+    seen_cursors = set()
 
     channel_types = ["public_channel"]
 
@@ -21,17 +23,26 @@ def get_channels(client, include_private=True):
 
             channels.extend(response.get("channels", []))
 
-            cursor = response.get("response_metadata", {}).get(
-                "next_cursor"
-            )
+            next_cursor = response.get(
+                "response_metadata", {}
+            ).get("next_cursor")
 
-            if not cursor:
+            if not next_cursor:
                 break
+
+            if next_cursor in seen_cursors:
+                raise RuntimeError(
+                    "Slack returned a repeated pagination cursor."
+                )
+
+            seen_cursors.add(next_cursor)
+            cursor = next_cursor
 
         return channels
 
     except SlackApiError as error:
         error_code = error.response.get("error", "unknown_error")
+
         raise RuntimeError(
             f"Failed to retrieve Slack channels: {error_code}"
         ) from error

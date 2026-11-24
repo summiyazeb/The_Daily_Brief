@@ -114,3 +114,24 @@ def test_slack_api_error():
         match="Failed to retrieve messages from channel C123: missing_scope",
     ):
         get_channel_messages(client, "C123")
+
+def test_repeated_pagination_cursor():
+    client = Mock()
+    client.conversations_history.side_effect = [
+        {
+            "messages": [{"ts": "123.456", "text": "First message"}],
+            "response_metadata": {"next_cursor": "next-page"},
+        },
+        {
+            "messages": [{"ts": "123.457", "text": "Second message"}],
+            "response_metadata": {"next_cursor": "next-page"},
+        },
+    ]
+
+    with pytest.raises(
+        RuntimeError,
+        match="Slack returned a repeated pagination cursor",
+    ):
+        get_channel_messages(client, "C123")
+
+    assert client.conversations_history.call_count == 2

@@ -1,3 +1,4 @@
+
 from slack_sdk.errors import SlackApiError
 
 
@@ -24,6 +25,7 @@ def get_channel_threads(client, channel_id, messages, limit=200):
 
             thread_messages = []
             cursor = None
+            seen_cursors = set()
             seen_timestamps = set()
 
             while True:
@@ -45,12 +47,20 @@ def get_channel_threads(client, channel_id, messages, limit=200):
                         thread_messages.append(reply_data)
                         seen_timestamps.add(timestamp)
 
-                cursor = response.get(
+                next_cursor = response.get(
                     "response_metadata", {}
                 ).get("next_cursor")
 
-                if not cursor:
+                if not next_cursor:
                     break
+
+                if next_cursor in seen_cursors:
+                    raise RuntimeError(
+                        "Slack returned a repeated pagination cursor."
+                    )
+
+                seen_cursors.add(next_cursor)
+                cursor = next_cursor
 
             threads.append({
                 "channel_id": channel_id,

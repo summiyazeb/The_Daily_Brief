@@ -17,6 +17,7 @@ def get_channel_messages(
 
     messages = []
     cursor = None
+    seen_cursors = set()
 
     try:
         while True:
@@ -44,12 +45,20 @@ def get_channel_messages(
                 message_data["channel_id"] = channel_id
                 messages.append(message_data)
 
-            cursor = response.get(
+            next_cursor = response.get(
                 "response_metadata", {}
             ).get("next_cursor")
 
-            if not cursor:
+            if not next_cursor:
                 break
+
+            if next_cursor in seen_cursors:
+                raise RuntimeError(
+                    "Slack returned a repeated pagination cursor."
+                )
+
+            seen_cursors.add(next_cursor)
+            cursor = next_cursor
 
         return messages
 

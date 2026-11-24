@@ -98,3 +98,24 @@ def test_slack_api_error():
         match="Failed to retrieve Slack channels: missing_scope",
     ):
         get_channels(client)
+
+def test_repeated_pagination_cursor():
+    client = Mock()
+    client.conversations_list.side_effect = [
+        {
+            "channels": [{"id": "C123", "name": "general"}],
+            "response_metadata": {"next_cursor": "next-page"},
+        },
+        {
+            "channels": [{"id": "C456", "name": "development"}],
+            "response_metadata": {"next_cursor": "next-page"},
+        },
+    ]
+
+    with pytest.raises(
+        RuntimeError,
+        match="Slack returned a repeated pagination cursor",
+    ):
+        get_channels(client)
+
+    assert client.conversations_list.call_count == 2
