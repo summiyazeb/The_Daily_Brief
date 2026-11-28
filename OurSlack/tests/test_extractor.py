@@ -125,3 +125,136 @@ def test_invalid_update_category():
             reason=None,
             source_references=[],
         )
+
+def test_completed_task_and_blocker_are_separate():
+    client = Mock()
+
+    client.chat.completions.create.return_value.choices = [
+        Mock(
+            message=Mock(
+                content=ExtractionResult(
+                    updates=[
+                        ProjectUpdate(
+                            category="completed_task",
+                            summary="Login page completed.",
+                            details="Sarah completed the login page.",
+                            responsible_people=["Sarah"],
+                            involved_people=["Sarah"],
+                            reason=None,
+                            source_references=[],
+                        ),
+                        ProjectUpdate(
+                            category="blocker",
+                            summary="Authentication bug prevents testing.",
+                            details="Testing is blocked by an authentication bug.",
+                            responsible_people=[],
+                            involved_people=["Sarah"],
+                            reason="Authentication bug",
+                            source_references=[],
+                        ),
+                    ]
+                ).model_dump_json()
+            )
+        )
+    ]
+
+    result = extract_project_updates(
+        [{"text": "Login page completed, but testing is blocked."}],
+        client=client,
+    )
+
+    assert len(result.updates) == 2
+
+    completed = result.updates[0]
+    blocker = result.updates[1]
+
+    assert completed.category == "completed_task"
+    assert blocker.category == "blocker"
+
+    assert "authentication bug" not in completed.details.lower()
+    assert "testing" not in completed.details.lower()
+
+def test_separate_tasks_from_same_message():
+    client = Mock()
+
+    client.chat.completions.create.return_value.choices = [
+        Mock(
+            message=Mock(
+                content=ExtractionResult(
+                    updates=[
+                        ProjectUpdate(
+                            category="completed_task",
+                            summary="Dashboard UI completed.",
+                            details="Sarah completed the dashboard UI.",
+                            responsible_people=["Sarah"],
+                            involved_people=["Sarah"],
+                            reason=None,
+                            source_references=[],
+                        ),
+                        ProjectUpdate(
+                            category="ongoing_task",
+                            summary="Backend API integration started.",
+                            details="Sarah started integrating the backend API.",
+                            responsible_people=["Sarah"],
+                            involved_people=["Sarah"],
+                            reason=None,
+                            source_references=[],
+                        ),
+                    ]
+                ).model_dump_json()
+            )
+        )
+    ]
+
+    result = extract_project_updates(
+        [
+            {
+                "text": (
+                    "The dashboard UI is complete. "
+                    "I have started integrating the backend API."
+                )
+            }
+        ],
+        client=client,
+    )
+
+    assert len(result.updates) == 2
+
+    assert result.updates[0].category == "completed_task"
+    assert result.updates[1].category == "ongoing_task"
+
+    assert "backend api" not in result.updates[0].details.lower()
+
+def test_reporting_blocker_does_not_assign_responsibility():
+    client = Mock()
+
+    client.chat.completions.create.return_value.choices = [
+        Mock(
+            message=Mock(
+                content=ExtractionResult(
+                    updates=[
+                        ProjectUpdate(
+                            category="blocker",
+                            summary="Authentication bug blocks testing.",
+                            details="Sarah reported an authentication bug.",
+                            responsible_people=[],
+                            involved_people=["Sarah"],
+                            reason="Authentication bug",
+                            source_references=[],
+                        )
+                    ]
+                ).model_dump_json()
+            )
+        )
+    ]
+
+    result = extract_project_updates(
+        [{"text": "I found an authentication bug that blocks testing."}],
+        client=client,
+    )
+
+    blocker = result.updates[0]
+
+    assert blocker.category == "blocker"
+    assert blocker.responsible_people == []
+    assert blocker.involved_people == ["Sarah"]

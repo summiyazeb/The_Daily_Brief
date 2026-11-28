@@ -73,16 +73,60 @@ ACCURACY:
 - Do not invent names, responsibilities, deadlines, reasons, or events.
 - If a reason is unknown, return null.
 
+SEPARATE UPDATES:
+- Extract each distinct project event as its own update.
+- If a task is completed but a related issue is blocking its testing,
+  create separate updates for the completed task and the blocker.
+- Never include an unresolved blocker as part of a completed_task
+  summary or details.
+- A completed task and a delay or blocker affecting its next stage
+  must remain separate updates.
+- Related updates may reference the same conversation, but must retain
+  their own category, summary, details, and source references.
+- Do not duplicate the same event across multiple categories.
+- When describing a completed_task, focus only on the work
+  that was completed. Do not include unresolved testing issues,
+  blockers, or delays in its summary or details.
+- Each update's summary and details must describe ONLY the event
+  belonging to its category.
+- Do not copy information about another task into the current
+  update's details, even when both tasks appear in the same message.
+- For completed_task, describe only what was finished.
+- For ongoing_task, describe only what is being worked on.
+- For blocker, describe only what is preventing progress.
+- For delay, describe only the delayed work and its reason.
+
 PEOPLE:
 - The input messages may contain both user_id and user_name fields.
-- Always use user_name (the human-readable name) in
-  responsible_people and involved_people.
+- Always use user_name in responsible_people and involved_people.
 - Never use Slack user IDs in these two fields.
 - Use user_id only in source_references.
-- Identify responsible people only when messages provide evidence.
-- Distinguish responsible people from people who are merely involved.
-- Do not assign responsibility based only on who posted a message.
-- If a person's name is unavailable, do not invent one.
+- Identify responsible people only when messages explicitly establish
+  their responsibility.
+- A person reporting a blocker is NOT automatically responsible
+  for resolving it.
+- A person discussing or reporting an issue is not necessarily
+  responsible for fixing it.
+- Assign responsibility when someone explicitly accepts ownership,
+  promises to investigate or resolve an issue, or is assigned the task.
+- Distinguish responsibility for individual tasks from responsibility
+  for related blockers.
+- Only identify involved people when there is evidence of their
+  participation or contribution.
+- If responsibility is unclear, return an empty list.
+- Never invent names or responsibilities.
+
+CATEGORY-SPECIFIC RESPONSIBILITY:
+- For completed_task: identify the person who completed the work.
+- For ongoing_task: identify the person who explicitly committed to
+  performing the work.
+- For blocker: responsible_people must contain only people explicitly
+  assigned to fix or resolve that blocker.
+- Reporting a blocker does not establish responsibility for it.
+- Promising to investigate a blocker does not automatically establish
+  responsibility for resolving the blocker itself.
+- A person may be responsible for investigating an issue without
+  being identified as responsible for the blocker.
 
 DUPLICATES:
 - Combine messages describing the same project update into one update
@@ -167,6 +211,7 @@ def extract_project_updates(messages, client=None, model=None):
                 },
             },
             temperature=0,
+            max_completion_tokens=4096,
         )
 
         content = response.choices[0].message.content
