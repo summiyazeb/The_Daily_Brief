@@ -1,4 +1,5 @@
 def process_messages(messages, threads=None, users=None):
+
     if not isinstance(messages, list):
         raise ValueError("Messages must be provided as a list.")
 
@@ -17,6 +18,10 @@ def process_messages(messages, threads=None, users=None):
         if not isinstance(message, dict):
             return
 
+        # Ignore Slack system events and process only normal messages.
+        if message.get("type", "message") != "message" or message.get("subtype"):
+            return
+        
         timestamp = message.get("ts")
 
         if not timestamp:

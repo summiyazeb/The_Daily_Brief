@@ -1,7 +1,8 @@
-import pytest
-from unittest.mock import Mock
 
-from openai import OpenAIError
+import pytest
+from unittest.mock import Mock, patch
+
+from groq import APIError
 
 from ourslack.extractor import (
     ExtractionResult,
@@ -24,10 +25,8 @@ def test_invalid_messages_input():
 
 
 def test_missing_api_key():
-    from unittest.mock import patch
-
     with patch.dict("os.environ", {}, clear=True):
-        with pytest.raises(ValueError, match="OPENAI_API_KEY is missing"):
+        with pytest.raises(ValueError, match="GROQ_API_KEY is missing"):
             extract_project_updates([{"text": "Task completed"}])
 
 
@@ -54,7 +53,13 @@ def test_successful_extraction():
     )
 
     client = Mock()
-    client.responses.parse.return_value.output_parsed = expected_result
+    client.chat.completions.create.return_value.choices = [
+        Mock(
+            message=Mock(
+                content=expected_result.model_dump_json()
+            )
+        )
+    ]
 
     result = extract_project_updates(
         [{"channel_id": "C123", "ts": "123.456", "text": "Authentication completed"}],
@@ -65,27 +70,31 @@ def test_successful_extraction():
     assert result.updates[0].category == "completed_task"
     assert result.updates[0].responsible_people == ["Sarah"]
 
-    client.responses.parse.assert_called_once()
+    client.chat.completions.create.assert_called_once()
 
 
 def test_extraction_returns_no_result():
     client = Mock()
-    client.responses.parse.return_value.output_parsed = None
+    client.chat.completions.create.return_value.choices = [
+        Mock(message=Mock(content=""))
+    ]
 
-    with pytest.raises(RuntimeError, match="no structured result"):
+    with pytest.raises(RuntimeError, match="empty response"):
         extract_project_updates(
             [{"text": "Some update"}],
             client=client,
         )
 
 
-def test_openai_api_error():
+def test_groq_api_error():
     client = Mock()
-    client.responses.parse.side_effect = OpenAIError(
-        "API request failed"
-    )
+    client.chat.completions.create.side_effect = APIError(
+    message="API request failed",
+    request=Mock(),
+    body=None,
+)
 
-    with pytest.raises(RuntimeError, match="AI extraction failed"):
+    with pytest.raises(RuntimeError, match="Groq extraction failed"):
         extract_project_updates(
             [{"text": "Some update"}],
             client=client,

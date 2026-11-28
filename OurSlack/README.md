@@ -18,7 +18,7 @@ It connects to Slack, retrieves messages from selected channels, collects conver
 
 - Python 3.14
 - Slack SDK
-- OpenAI API
+- Groq API for AI-powered project update extraction
 - Pydantic
 - Pytest
 
